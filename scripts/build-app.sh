@@ -81,6 +81,15 @@ if [ -f "Sources/MouseWheelRepairix/mouse_icon.png" ]; then
     echo "   Menu Bar Icon: mouse_icon.png"
 fi
 
+# Ad-hoc code sign the app (allows right-click open without "damaged" warning)
+echo "🔏 Signing app (ad-hoc)..."
+codesign --force --deep --sign - "$APP_DIR"
+if codesign -v "$APP_DIR" 2>/dev/null; then
+    echo "   Signature: Valid (ad-hoc)"
+else
+    echo "   ⚠️  Warning: Signing failed"
+fi
+
 echo "✅ Built: $APP_DIR"
 echo "   Version: ${VERSION}"
 echo "   Build: ${BUILD}"
