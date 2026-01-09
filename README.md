@@ -4,7 +4,7 @@
   <img src="MouseIcon.png" alt="MouseWheelRepairix Icon" width="128">
 </p>
 
-**Fix erratic mouse wheel scrolling on macOS** – A lightweight menu bar utility that debounces misbehaving scroll wheel events.
+**Fix erratic mouse wheel klicking on macOS** – A lightweight menu bar utility that debounces misbehaving scroll wheel events.
 
 <p align="center">
   <img src="Screenshots/Start.png" alt="MouseWheelRepairix Main Interface" width="600">
