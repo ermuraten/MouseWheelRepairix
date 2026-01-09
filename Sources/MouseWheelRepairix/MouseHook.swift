@@ -6,8 +6,25 @@ class MouseHook {
     private var runLoopSource: CFRunLoopSource?
     private var lastClickTime: TimeInterval = 0
     
+    // Separate timing for measurement (tracks ALL clicks including debounced ones)
+    private var lastMeasurementTime: TimeInterval = 0
+    
     // Default debounce interval in seconds (100ms)
     var debounceInterval: TimeInterval = 0.1
+    
+    // Measurement mode
+    var measurementMode: Bool = false {
+        didSet {
+            if measurementMode {
+                // Reset measurement time when entering measurement mode
+                lastMeasurementTime = 0
+                print("[DEBUG] Measurement mode ENABLED")
+            } else {
+                print("[DEBUG] Measurement mode DISABLED")
+            }
+        }
+    }
+    var clickIntervalCallback: ((Double) -> Void)?
     
     // Middle mouse button number (usually 2)
     private let middleButtonNumber: Int64 = 2
@@ -55,16 +72,36 @@ class MouseHook {
     }
 
     private func handle(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        // DEBUG: Log ALL events to see what's coming in
+        let buttonNumber = event.getIntegerValueField(.mouseEventButtonNumber)
+        print("[EVENT] Type: \(type.rawValue), Button: \(buttonNumber), measurementMode: \(measurementMode)")
+        
         // Only interested in middle mouse button (button number 2)
-        if event.getIntegerValueField(.mouseEventButtonNumber) == middleButtonNumber {
+        if buttonNumber == middleButtonNumber {
             
             if type == .otherMouseDown {
+                print("[MIDDLE CLICK] Detected at \(Date())")
                 let now = Date().timeIntervalSince1970
+                
+                // MEASUREMENT MODE: Track ALL clicks with separate timer
+                if measurementMode {
+                    print("[MEASUREMENT] Mode is ON, lastTime: \(lastMeasurementTime)")
+                    if lastMeasurementTime > 0 {
+                        let intervalMs = (now - lastMeasurementTime) * 1000.0
+                        print("[MEASUREMENT] Interval: \(String(format: "%.1f", intervalMs))ms")
+                        DispatchQueue.main.async { [weak self] in
+                            self?.clickIntervalCallback?(intervalMs)
+                        }
+                    } else {
+                        print("[MEASUREMENT] First click registered!")
+                    }
+                    // ALWAYS update measurement time for EVERY click
+                    lastMeasurementTime = now
+                }
+                
+                // DEBOUNCE LOGIC: Uses separate timer
                 let timeSinceLastClick = now - lastClickTime
                 
-                // Debug print
-                // print("Middle Click detected. Delta: \(timeSinceLastClick)")
-
                 if timeSinceLastClick < debounceInterval {
                     print("Debounced! (Delta: \(String(format: "%.3f", timeSinceLastClick))s < \(debounceInterval)s)")
                     // Block the event
@@ -79,3 +116,4 @@ class MouseHook {
         return Unmanaged.passUnretained(event)
     }
 }
+
