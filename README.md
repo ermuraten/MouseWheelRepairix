@@ -29,8 +29,19 @@ Over time, the mouse wheel button (middle click) wears out and starts registerin
 
 1. Download the latest `.dmg` from [Releases](https://github.com/ermuraten/MouseWheelRepairix/releases)
 2. Open the DMG and drag the app to Applications
-3. Launch from Applications folder
-4. Grant Accessibility permissions when prompted (required to intercept scroll events)
+3. **First Launch:** Since the app is not notarized by Apple, macOS may block it. Use one of these methods:
+
+   **Option A – Right-Click (easiest):**
+   - Right-click (or Control-click) on the app → Select **"Open"**
+   - Click **"Open"** in the dialog that appears
+   - You only need to do this once!
+
+   **Option B – Terminal:**
+   ```bash
+   xattr -cr /Applications/MouseWheelRepairix.app
+   ```
+
+4. Grant Accessibility permissions when prompted (required to intercept mouse events)
 
 ## 🔧 Usage
 
