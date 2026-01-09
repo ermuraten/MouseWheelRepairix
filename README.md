@@ -6,16 +6,16 @@
 
 **Fix erratic mouse wheel scrolling on macOS** – A lightweight menu bar utility that debounces misbehaving scroll wheel events.
 
-## 🎯 Das Problem
+## 🎯 The Problem
 
-Mit der Zeit verschleißt der Encoder im Mausrad und verursacht **Doppelklicks beim Scrollen**:
-- Du scrollst einmal nach unten, aber es werden zwei Klicks registriert
-- Das Scrollen fühlt sich "sprunghaft" oder ungenau an
-- Besonders bei langsamem Scrollen tritt das Problem auf
+Over time, the encoder inside your mouse scroll wheel wears out and causes **double-clicks when scrolling**:
+- You scroll once, but two clicks are registered
+- Scrolling feels "jumpy" or imprecise
+- The issue is especially noticeable when scrolling slowly
 
-**Die Ursache:** Der mechanische Encoder im Scrollrad ist abgenutzt und erzeugt Prellsignale.
+**The cause:** The mechanical encoder in the scroll wheel is worn and produces bouncing signals.
 
-**Die Lösung:** MouseWheelRepairix filtert diese doppelten Signale heraus (Debouncing) – ganz ohne die Maus zu öffnen!
+**The solution:** MouseWheelRepairix filters out these duplicate signals (debouncing) – no need to open your mouse!
 
 ## ✨ Features
 
