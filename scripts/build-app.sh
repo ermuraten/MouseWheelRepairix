@@ -61,14 +61,18 @@ cat > "$APP_DIR/Contents/Info.plist" << EOF
 </plist>
 EOF
 
-# Copy icon if exists
-if [ -d "MouseWheelRepairix.iconset" ]; then
+# Copy icon - check multiple locations
+if [ -f "Sources/MouseWheelRepairix/AppIcon.icns" ]; then
+    cp "Sources/MouseWheelRepairix/AppIcon.icns" "$APP_DIR/Contents/Resources/"
+    echo "   Icon: Sources/MouseWheelRepairix/AppIcon.icns"
+elif [ -d "MouseWheelRepairix.iconset" ]; then
     iconutil -c icns MouseWheelRepairix.iconset -o "$APP_DIR/Contents/Resources/AppIcon.icns" 2>/dev/null || true
-fi
-
-# Copy existing icns if available
-if [ -f "AppIcon.icns" ]; then
+    echo "   Icon: Generated from iconset"
+elif [ -f "AppIcon.icns" ]; then
     cp AppIcon.icns "$APP_DIR/Contents/Resources/"
+    echo "   Icon: AppIcon.icns"
+else
+    echo "   ⚠️  Warning: No icon found!"
 fi
 
 echo "✅ Built: $APP_DIR"
