@@ -75,6 +75,12 @@ else
     echo "   ⚠️  Warning: No icon found!"
 fi
 
+# Copy menu bar icon
+if [ -f "Sources/MouseWheelRepairix/mouse_icon.png" ]; then
+    cp "Sources/MouseWheelRepairix/mouse_icon.png" "$APP_DIR/Contents/Resources/"
+    echo "   Menu Bar Icon: mouse_icon.png"
+fi
+
 echo "✅ Built: $APP_DIR"
 echo "   Version: ${VERSION}"
 echo "   Build: ${BUILD}"

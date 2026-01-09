@@ -25,10 +25,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize Status Item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            // Load user's custom icon with alpha transparency
+            // Load colored mouse icon with red scroll wheel
             let resourcePath = Bundle.main.path(forResource: "mouse_icon", ofType: "png")
             if let path = resourcePath, let image = NSImage(contentsOfFile: path) {
-                image.isTemplate = true // Makes it adapt to dark/light mode
+                // Use colored icon (not template) to show red scroll wheel
+                image.isTemplate = false
+                image.size = NSSize(width: 18, height: 18)
                 button.image = image
             } else {
                 // Fallback
