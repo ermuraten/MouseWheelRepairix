@@ -8,14 +8,14 @@
 
 ## 🎯 The Problem
 
-Over time, the encoder inside your mouse scroll wheel wears out and causes **double-clicks when scrolling**:
-- You scroll once, but two clicks are registered
-- Scrolling feels "jumpy" or imprecise
-- The issue is especially noticeable when scrolling slowly
+Over time, the mouse wheel button (middle click) wears out and starts registering **double-clicks**:
+- You click the mouse wheel once, but two clicks are registered
+- Middle-click actions trigger twice unexpectedly
+- Opening links in new tabs opens two tabs instead of one
 
-**The cause:** The mechanical encoder in the scroll wheel is worn and produces bouncing signals.
+**The cause:** The mechanical switch under the scroll wheel is worn and produces bouncing signals.
 
-**The solution:** MouseWheelRepairix filters out these duplicate signals (debouncing) – no need to open your mouse!
+**The solution:** MouseWheelRepairix filters out these duplicate click signals (debouncing) – no need to open or replace your mouse!
 
 ## ✨ Features
 
