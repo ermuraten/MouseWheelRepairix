@@ -36,6 +36,10 @@ echo "📄 Copying files..."
 cp -R "${APP_NAME}.app" "$DMG_TEMP_DIR/"
 cp "README.md" "$DMG_TEMP_DIR/README.txt" # .txt often opens easier for users without markdown viewer, but keep md content. Or keep .md. Let's keep .md but maybe COPY as README.txt is safer? nah, .md is fine on macOS.
 
+if [ -d "Screenshots" ]; then
+    cp -R "Screenshots" "$DMG_TEMP_DIR/"
+fi
+
 # Create Source Code Web Link
 echo '<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
