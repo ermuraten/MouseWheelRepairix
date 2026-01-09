@@ -4,6 +4,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var mouseHook: MouseHook!
     
+    // Popover UI
+    var popover: NSPopover!
+    var popoverVC: PopoverViewController!
+    var blockedClickCount: Int = 0
+    var lastClickInterval: Int?
+    
     // Measurement window
     var measurementWindow: NSWindow?
     var intervalTextView: NSTextView?
@@ -36,23 +42,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // Fallback
                 button.title = "🖱"
             }
+            button.action = #selector(togglePopover(_:))
+            button.target = self
         }
-        
-        setupMenu()
         
         // Check permissions
         checkAccessibilityPermissions()
         
-        // Initialize and start hook
+        // Initialize and start hook FIRST (before popover needs it)
         mouseHook = MouseHook()
         mouseHook.clickIntervalCallback = { [weak self] intervalMs in
             self?.handleClickInterval(intervalMs)
+        }
+        mouseHook.blockedClickCallback = { [weak self] in
+            self?.handleBlockedClick()
         }
         
         // Load saved debounce time
         loadSavedDebounceTime()
         
+        // Setup popover AFTER mouseHook exists
+        setupPopover()
+        
         mouseHook.start()
+    }
+    
+    func handleBlockedClick() {
+        blockedClickCount += 1
+        // Update UI if popover is visible
+        if popover.isShown {
+             popoverVC.updateStats(blockedCount: blockedClickCount, lastInterval: lastClickInterval)
+        }
     }
     
     func loadSavedDebounceTime() {
@@ -143,6 +163,70 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         return appFolder.appendingPathComponent("settings.plist")
     }
+    
+    // MARK: - Popover Setup
+    
+    func setupPopover() {
+        popoverVC = PopoverViewController()
+        popoverVC.appDelegate = self
+        
+        popover = NSPopover()
+        popover.contentSize = NSSize(width: 380, height: 440)
+        popover.behavior = .transient
+        popover.contentViewController = popoverVC
+        // Note: Don't call updateDebounceValue here - view isn't loaded yet
+    }
+    
+    @objc func togglePopover(_ sender: Any?) {
+        if popover.isShown {
+            closePopover()
+        } else {
+            showPopover()
+        }
+    }
+    
+    func showPopover() {
+        if let button = statusItem.button {
+            // Update stats before showing
+            popoverVC.updateStats(blockedCount: blockedClickCount, lastInterval: lastClickInterval)
+            popoverVC.updateStatus(isActive: mouseHook?.isActive ?? false)
+            
+            let currentMs = Int((mouseHook.debounceInterval) * 1000)
+            popoverVC.updateDebounceValue(currentMs)
+            
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        }
+    }
+    
+    func closePopover() {
+        popover.performClose(nil)
+    }
+    
+    // MARK: - Public Methods for PopoverVC
+    
+    var launchAtLogin: Bool {
+        // Check current state - simplified for now
+        return false
+    }
+    
+    func updateDebounceTime(_ ms: Int) {
+        let seconds = TimeInterval(ms) / 1000.0
+        mouseHook.debounceInterval = seconds
+        saveDebounceTime(Double(ms))
+    }
+    
+    @objc func toggleRepair(_ sender: Any) {
+        mouseHook.isActive.toggle()
+        popoverVC.updateStatus(isActive: mouseHook.isActive)
+    }
+    
+    @objc func toggleLaunchAtLogin(_ sender: Any) {
+        if let menuItem = sender as? NSMenuItem {
+            toggleStartAtLogin(menuItem)
+        }
+    }
+    
+    // MARK: - Legacy Menu (keeping for reference)
     
     func setupMenu() {
         let menu = NSMenu()
@@ -585,6 +669,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func handleClickInterval(_ intervalMs: Double) {
+        // Forward to popover measurement view
+        popoverVC?.addMeasurementInterval(intervalMs)
+        
+        // Also update legacy measurement window if open
         clickIntervals.append(intervalMs)
         if clickIntervals.count > maxIntervals {
             clickIntervals.removeFirst()

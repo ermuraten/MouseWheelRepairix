@@ -12,6 +12,9 @@ class MouseHook {
     // Default debounce interval in seconds (100ms)
     var debounceInterval: TimeInterval = 0.1
     
+    // Whether debouncing is active
+    var isActive: Bool = true
+    
     // Measurement mode
     var measurementMode: Bool = false {
         didSet {
@@ -25,6 +28,7 @@ class MouseHook {
         }
     }
     var clickIntervalCallback: ((Double) -> Void)?
+    var blockedClickCallback: (() -> Void)?
     
     // Middle mouse button number (usually 2)
     private let middleButtonNumber: Int64 = 2
@@ -99,13 +103,19 @@ class MouseHook {
                     lastMeasurementTime = now
                 }
                 
-                // DEBOUNCE LOGIC: Uses separate timer
-                let timeSinceLastClick = now - lastClickTime
-                
-                if timeSinceLastClick < debounceInterval {
-                    print("Debounced! (Delta: \(String(format: "%.3f", timeSinceLastClick))s < \(debounceInterval)s)")
-                    // Block the event
-                    return nil
+                // DEBOUNCE LOGIC: Uses separate timer (only if active)
+                if isActive {
+                    let timeSinceLastClick = now - lastClickTime
+                    
+                    if timeSinceLastClick < debounceInterval {
+                        print("Debounced! (Delta: \(String(format: "%.3f", timeSinceLastClick))s < \(debounceInterval)s)")
+                        // Trigger callback for blocked click
+                        DispatchQueue.main.async { [weak self] in
+                            self?.blockedClickCallback?()
+                        }
+                        // Block the event
+                        return nil
+                    }
                 }
                 
                 lastClickTime = now
