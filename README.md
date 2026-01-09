@@ -71,6 +71,14 @@ MIT License – Feel free to use, modify, and distribute.
 
 ---
 
+## ☕ Support the Project
+
+If MouseWheelRepairix saved your mouse from the trash bin and you'd like to support its development, feel free to buy me a coffee! Every donation helps keep the project alive.
+
+[**Donate via PayPal**](https://paypal.me/VeniceWaveRecords)
+
+---
+
 <p align="center">
   <sub>Made with ❤️ for frustrated mouse owners</sub>
 </p>

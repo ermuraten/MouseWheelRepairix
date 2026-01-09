@@ -201,6 +201,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(measurementItem)
         
         menu.addItem(NSMenuItem.separator())
+        let donateItem = NSMenuItem(title: "☕ Buy me a coffee...", action: #selector(openDonation(_:)), keyEquivalent: "")
+        menu.addItem(donateItem)
+        
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "About MouseWheel Repairix", action: #selector(showAbout(_:)), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -616,6 +620,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func clearMeasurements(_ sender: Any) {
         clickIntervals.removeAll()
         updateMeasurementDisplay()
+    }
+    
+    @objc func openDonation(_ sender: NSMenuItem) {
+        if let url = URL(string: "https://paypal.me/VeniceWaveRecords") {
+            NSWorkspace.shared.open(url)
+        }
     }
 }
 
