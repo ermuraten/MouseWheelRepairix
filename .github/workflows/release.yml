@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-14  # Apple Silicon runner for Universal Binary
+    runs-on: macos-14  # Apple Silicon runner
     
     steps:
     - name: Checkout
@@ -21,9 +21,14 @@ jobs:
       with:
         xcode-version: latest-stable
     
-    - name: Build Release
+    - name: Build Universal Binary
       run: |
-        swift build -c release
+        # Build for both architectures
+        swift build -c release --arch arm64 --arch x86_64
+        
+        # Verify it's universal
+        echo "Checking binary architectures:"
+        file .build/apple/Products/Release/MouseWheelRepairix || file .build/release/MouseWheelRepairix
     
     - name: Create App Bundle
       run: |
