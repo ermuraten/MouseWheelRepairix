@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-14  # Apple Silicon runner for Universal Binary
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Setup Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+    
+    - name: Build Release
+      run: |
+        swift build -c release
+    
+    - name: Create App Bundle
+      run: |
+        chmod +x ./scripts/build-app.sh
+        ./scripts/build-app.sh
+    
+    - name: Create DMG
+      run: |
+        VERSION="${GITHUB_REF#refs/tags/v}"
+        APP_NAME="MouseWheelRepairix"
+        DMG_NAME="${APP_NAME}-${VERSION}.dmg"
+        
+        # Create DMG staging directory
+        mkdir -p dist/dmg_temp
+        cp -R "${APP_NAME}.app" dist/dmg_temp/
+        cp README.md dist/dmg_temp/
+        
+        # Copy screenshots if they exist
+        if [ -d "Screenshots" ]; then
+          cp -R Screenshots dist/dmg_temp/
+        fi
+        
+        # Create Applications symlink
+        ln -s /Applications dist/dmg_temp/Applications
+        
+        # Create Source Code webloc
+        cat > "dist/dmg_temp/Source Code.webloc" << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+          <key>URL</key>
+          <string>https://github.com/ermuraten/MouseWheelRepairix</string>
+        </dict>
+        </plist>
+        EOF
+        
+        # Create DMG
+        hdiutil create -volname "$APP_NAME" \
+          -srcfolder dist/dmg_temp \
+          -ov -format UDZO \
+          "dist/${DMG_NAME}"
+        
+        # Cleanup
+        rm -rf dist/dmg_temp
+        
+        echo "DMG_PATH=dist/${DMG_NAME}" >> $GITHUB_ENV
+        echo "DMG_NAME=${DMG_NAME}" >> $GITHUB_ENV
+    
+    - name: Upload Release Asset
+      uses: softprops/action-gh-release@v2
+      with:
+        files: ${{ env.DMG_PATH }}
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
