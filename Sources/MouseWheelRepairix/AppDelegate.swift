@@ -491,10 +491,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 <string>com.murat.MouseWheelRepairix</string>
                 <key>ProgramArguments</key>
                 <array>
-                    <string>\(appPath)/Contents/MacOS/MouseWheelRepairix</string>
+                    <string>/usr/bin/open</string>
+                    <string>\(appPath)</string>
                 </array>
                 <key>RunAtLoad</key>
                 <true/>
+                <key>KeepAlive</key>
+                <false/>
                 <key>ProcessType</key>
                 <string>Interactive</string>
             </dict>
