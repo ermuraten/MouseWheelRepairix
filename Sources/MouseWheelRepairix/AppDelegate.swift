@@ -205,8 +205,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Public Methods for PopoverVC
     
     var launchAtLogin: Bool {
-        // Check current state - simplified for now
-        return false
+        return isAppLoginItem()
     }
     
     func updateDebounceTime(_ ms: Int) {
@@ -221,7 +220,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc func toggleLaunchAtLogin(_ sender: Any) {
-        if let menuItem = sender as? NSMenuItem {
+        if let switchControl = sender as? NSSwitch {
+            let newState = (switchControl.state == .on)
+            let success = setAppLoginItem(enabled: newState)
+            if !success {
+                // Revert visual state if failed
+                switchControl.state = newState ? .off : .on
+                let alert = NSAlert()
+                alert.messageText = "Error"
+                alert.informativeText = "Could not create/delete LaunchAgent plist."
+                alert.runModal()
+            }
+        } else if let menuItem = sender as? NSMenuItem {
             toggleStartAtLogin(menuItem)
         }
     }
