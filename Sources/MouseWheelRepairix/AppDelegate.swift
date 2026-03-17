@@ -13,8 +13,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Measurement window
     var measurementWindow: NSWindow?
     var intervalTextView: NSTextView?
-    var clickIntervals: [Double] = []
-    let maxIntervals = 10
+    var clickMeasurements: [(interval: Double, duration: Double)] = []
+    let maxIntervals = 50
+    private var lastMeasureDownTime: TimeInterval = 0
     
     // Selected time tag mapping
     let timeIntervals: [Int: TimeInterval] = [
@@ -51,8 +52,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Initialize and start hook FIRST (before popover needs it)
         mouseHook = MouseHook()
-        mouseHook.clickIntervalCallback = { [weak self] intervalMs in
-            self?.handleClickInterval(intervalMs)
+        mouseHook.rawEventCallback = { [weak self] isDown, timestamp in
+            self?.handleRawEvent(isDown: isDown, timestamp: timestamp)
         }
         mouseHook.blockedClickCallback = { [weak self] in
             self?.handleBlockedClick()
@@ -669,7 +670,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // Reset measurements
-        clickIntervals.removeAll()
+        clickMeasurements.removeAll()
+        lastMeasureDownTime = 0
         updateMeasurementDisplay()
         
         // Ensure window is visible and active
@@ -681,15 +683,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         measurementWindow?.orderOut(nil)
     }
     
-    func handleClickInterval(_ intervalMs: Double) {
+    func handleRawEvent(isDown: Bool, timestamp: TimeInterval) {
         // Forward to popover measurement view
-        popoverVC?.addMeasurementInterval(intervalMs)
+        popoverVC?.addRawEvent(isDown: isDown, timestamp: timestamp)
+        
+        let nowMs = timestamp * 1000.0
         
         // Also update legacy measurement window if open
-        clickIntervals.append(intervalMs)
-        if clickIntervals.count > maxIntervals {
-            clickIntervals.removeFirst()
+        if isDown {
+            let interval = lastMeasureDownTime > 0 ? nowMs - lastMeasureDownTime : 0
+            lastMeasureDownTime = nowMs
+            
+            clickMeasurements.append((interval: interval, duration: -1))
+            if clickMeasurements.count > maxIntervals {
+                clickMeasurements.removeFirst()
+            }
+        } else {
+            if !clickMeasurements.isEmpty && clickMeasurements.last!.duration == -1 {
+                let dur = nowMs - lastMeasureDownTime
+                clickMeasurements[clickMeasurements.count - 1].duration = dur
+            }
         }
+        
         updateMeasurementDisplay()
     }
     
@@ -697,8 +712,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let textView = intervalTextView else { return }
         
         var text = ""
-        for (index, interval) in clickIntervals.enumerated() {
-            text += String(format: "%2d. %6.1f ms\n", index + 1, interval)
+        for (index, m) in clickMeasurements.enumerated() {
+            let intStr = m.interval > 0 ? String(format: "%5.1f ms", m.interval) : "   --- ms"
+            let durStr = m.duration >= 0 ? String(format: "%5.1f ms", m.duration) : "   --- ms"
+            text += String(format: "%2d. Int: %@ | Dur: %@\n", index + 1, intStr, durStr)
         }
         
         if text.isEmpty {
@@ -709,17 +726,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Update average
         if let avgLabel = measurementWindow?.contentView?.viewWithTag(999) as? NSTextField {
-            if clickIntervals.isEmpty {
+            let valid = clickMeasurements.filter { $0.interval > 0 }
+            if valid.isEmpty {
                 avgLabel.stringValue = "Average: -- ms"
             } else {
-                let avg = clickIntervals.reduce(0, +) / Double(clickIntervals.count)
+                let avg = valid.map { $0.interval }.reduce(0, +) / Double(valid.count)
                 avgLabel.stringValue = String(format: "Average: %.1f ms", avg)
             }
         }
     }
     
     @objc func clearMeasurements(_ sender: Any) {
-        clickIntervals.removeAll()
+        clickMeasurements.removeAll()
+        lastMeasureDownTime = 0
         updateMeasurementDisplay()
     }
     

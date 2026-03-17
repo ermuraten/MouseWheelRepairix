@@ -24,8 +24,10 @@ class PopoverViewController: NSViewController {
     private var measureIntervalLabel: NSTextField!
     private var measureHistoryView: NSStackView!
     private var emptyStateLabel: NSTextField!
-    private var clickIntervals: [Double] = []
-    private let maxIntervals = 8
+    private var clickMeasurements: [(index: Int, interval: Double, duration: Double)] = []
+    private var measureCounter = 0
+    private var lastMeasureDownTime: TimeInterval = 0
+    private let maxIntervals = 50
     
     private var isShowingMeasure = false
     private var isShowingAbout = false
@@ -202,7 +204,19 @@ class PopoverViewController: NSViewController {
         measureHistoryView.orientation = .vertical
         measureHistoryView.spacing = 4
         measureHistoryView.alignment = .leading
-        mainStack.addArrangedSubview(measureHistoryView)
+        
+        let historyScrollView = NSScrollView()
+        historyScrollView.hasVerticalScroller = true
+        historyScrollView.drawsBackground = false
+        historyScrollView.documentView = measureHistoryView
+        historyScrollView.translatesAutoresizingMaskIntoConstraints = false
+        
+        mainStack.addArrangedSubview(historyScrollView)
+        
+        NSLayoutConstraint.activate([
+            historyScrollView.heightAnchor.constraint(equalToConstant: 120),
+            measureHistoryView.widthAnchor.constraint(equalTo: historyScrollView.widthAnchor, constant: -16)
+        ])
         
         // Initial state
         measureHistoryView.isHidden = true
@@ -222,23 +236,30 @@ class PopoverViewController: NSViewController {
         return container
     }
     
-    private func createHistoryRow(interval: Double?, index: Int) -> NSView {
+    private func createHistoryRow(measurement: (index: Int, interval: Double, duration: Double)) -> NSView {
         let row = NSStackView()
         row.orientation = .horizontal
         row.spacing = 8
         
-        
-        let numLabel = NSTextField(labelWithString: interval != nil ? "\(index)." : "")
+        let numLabel = NSTextField(labelWithString: "\(measurement.index).")
         numLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         numLabel.textColor = NSColor.white.withAlphaComponent(0.4)
-        numLabel.widthAnchor.constraint(equalToConstant: 20).isActive = true
+        numLabel.widthAnchor.constraint(equalToConstant: 25).isActive = true
         
-        let valueLabel = NSTextField(labelWithString: interval != nil ? String(format: "%.0f ms", interval!) : "")
-        valueLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
-        valueLabel.textColor = interval != nil ? .white : NSColor.white.withAlphaComponent(0.3)
+        let intStr = measurement.interval > 0 ? String(format: "Int: %4.0f", measurement.interval) : "Int:  ---"
+        let intLabel = NSTextField(labelWithString: intStr)
+        intLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        intLabel.textColor = (measurement.interval > 0 && measurement.interval < 100) ? NSColor.systemRed : .white
+        intLabel.widthAnchor.constraint(equalToConstant: 65).isActive = true
+        
+        let durStr = measurement.duration >= 0 ? String(format: " Dur: %4.0f", measurement.duration) : " Dur:  ---"
+        let durLabel = NSTextField(labelWithString: durStr)
+        durLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        durLabel.textColor = NSColor.systemTeal.withAlphaComponent(0.9)
         
         row.addArrangedSubview(numLabel)
-        row.addArrangedSubview(valueLabel)
+        row.addArrangedSubview(intLabel)
+        row.addArrangedSubview(durLabel)
         row.addArrangedSubview(NSView())
         
         return row
@@ -252,7 +273,9 @@ class PopoverViewController: NSViewController {
         
         // Start measurement mode
         appDelegate?.mouseHook.measurementMode = true
-        clickIntervals = []
+        clickMeasurements = []
+        measureCounter = 0
+        lastMeasureDownTime = 0
         updateMeasureHistory()
         measureIntervalLabel.stringValue = "0"
         
@@ -906,29 +929,45 @@ class PopoverViewController: NSViewController {
         statusTextLabel?.stringValue = isActive ? "Active" : "Inactive"
     }
     
-    func addMeasurementInterval(_ intervalMs: Double) {
-        clickIntervals.insert(intervalMs, at: 0)
-        if clickIntervals.count > maxIntervals {
-            clickIntervals.removeLast()
+    func addRawEvent(isDown: Bool, timestamp: TimeInterval) {
+        if !isShowingMeasure { return }
+        
+        let nowMs = timestamp * 1000.0
+        
+        if isDown {
+            let interval = lastMeasureDownTime > 0 ? nowMs - lastMeasureDownTime : 0
+            lastMeasureDownTime = nowMs
+            
+            measureCounter += 1
+            clickMeasurements.insert((index: measureCounter, interval: interval, duration: -1), at: 0)
+            
+            if clickMeasurements.count > maxIntervals {
+                clickMeasurements.removeLast()
+            }
+            
+            measureIntervalLabel?.stringValue = String(format: "%.0f", interval)
+            measureIntervalLabel?.textColor = (interval < 100 && interval > 0) ? NSColor.systemRed : NSColor.systemGreen
+            
+            // Also update main view's last interval (if we switch back quickly)
+            lastIntervalLabel?.stringValue = String(format: "%.0f", interval)
+        } else {
+            // Find most recent incomplete click
+            if !clickMeasurements.isEmpty && clickMeasurements[0].duration == -1 {
+                let duration = nowMs - lastMeasureDownTime
+                clickMeasurements[0].duration = duration
+            }
         }
         
-        // Update main view's interval display
-        lastIntervalLabel?.stringValue = String(format: "%.0f", intervalMs)
-        
-        // Update measure view display if showing
-        if isShowingMeasure {
-            measureIntervalLabel?.stringValue = String(format: "%.0f", intervalMs)
-            measureIntervalLabel?.textColor = intervalMs < 100 ? NSColor.systemRed : NSColor.systemGreen
-            updateMeasureHistory()
-        }
+        updateMeasureHistory()
     }
     
     private func updateMeasureHistory() {
         guard let historyView = measureHistoryView else { return }
         
-        let hasData = !clickIntervals.isEmpty
+        let hasData = !clickMeasurements.isEmpty
         emptyStateLabel?.isHidden = hasData
-        historyView.isHidden = !hasData
+        historyView.isHidden = !hasData // Keep stackview visibility in sync
+        historyView.superview?.superview?.isHidden = !hasData // Hide scrollview if empty
         
         // Remove old rows
         for view in historyView.arrangedSubviews {
@@ -937,10 +976,8 @@ class PopoverViewController: NSViewController {
         }
         
         if hasData {
-            // Add rows (always 4)
-            for i in 0..<4 {
-                let interval = i < clickIntervals.count ? clickIntervals[i] : nil
-                let row = createHistoryRow(interval: interval, index: i + 1)
+            for m in clickMeasurements {
+                let row = createHistoryRow(measurement: m)
                 historyView.addArrangedSubview(row)
             }
         }

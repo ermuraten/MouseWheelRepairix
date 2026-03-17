@@ -4,10 +4,11 @@ import CoreGraphics
 class MouseHook {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var lastClickTime: TimeInterval = 0
-    
-    // Separate timing for measurement (tracks ALL clicks including debounced ones)
-    private var lastMeasurementTime: TimeInterval = 0
+    private var virtuallyDown: Bool = false
+    private var lastPassedDownTime: TimeInterval = 0
+    private var lastPassedUpTime: TimeInterval = 0
+    private var lastPhysicalDownTime: TimeInterval = 0
+    private var lastPhysicalUpTime: TimeInterval = 0
     
     // Default debounce interval in seconds (100ms)
     var debounceInterval: TimeInterval = 0.1
@@ -19,15 +20,13 @@ class MouseHook {
     var measurementMode: Bool = false {
         didSet {
             if measurementMode {
-                // Reset measurement time when entering measurement mode
-                lastMeasurementTime = 0
                 print("[DEBUG] Measurement mode ENABLED")
             } else {
                 print("[DEBUG] Measurement mode DISABLED")
             }
         }
     }
-    var clickIntervalCallback: ((Double) -> Void)?
+    var rawEventCallback: ((_ isDown: Bool, _ timestamp: TimeInterval) -> Void)?
     var blockedClickCallback: (() -> Void)?
     
     // Middle mouse button number (usually 2)
@@ -87,38 +86,64 @@ class MouseHook {
                 print("[MIDDLE CLICK] Detected at \(Date())")
                 let now = Date().timeIntervalSince1970
                 
-                // MEASUREMENT MODE: Track ALL clicks with separate timer
                 if measurementMode {
-                    print("[MEASUREMENT] Mode is ON, lastTime: \(lastMeasurementTime)")
-                    if lastMeasurementTime > 0 {
-                        let intervalMs = (now - lastMeasurementTime) * 1000.0
-                        print("[MEASUREMENT] Interval: \(String(format: "%.1f", intervalMs))ms")
-                        DispatchQueue.main.async { [weak self] in
-                            self?.clickIntervalCallback?(intervalMs)
-                        }
-                    } else {
-                        print("[MEASUREMENT] First click registered!")
+                    DispatchQueue.main.async { [weak self] in
+                        self?.rawEventCallback?(true, now)
                     }
-                    // ALWAYS update measurement time for EVERY click
-                    lastMeasurementTime = now
                 }
+                lastPhysicalDownTime = now
                 
-                // DEBOUNCE LOGIC: Uses separate timer (only if active)
                 if isActive {
-                    let timeSinceLastClick = now - lastClickTime
+                    let downToDown = now - lastPassedDownTime
+                    let upToDown = now - lastPassedUpTime
                     
-                    if timeSinceLastClick < debounceInterval {
-                        print("Debounced! (Delta: \(String(format: "%.3f", timeSinceLastClick))s < \(debounceInterval)s)")
-                        // Trigger callback for blocked click
-                        DispatchQueue.main.async { [weak self] in
-                            self?.blockedClickCallback?()
-                        }
-                        // Block the event
+                    if virtuallyDown {
+                        // Make-bounce physically Down while already OS virtual Down
+                        DispatchQueue.main.async { [weak self] in self?.blockedClickCallback?() }
                         return nil
                     }
+                    
+                    if downToDown < debounceInterval {
+                        // Too fast make-bounce or multi-click
+                        DispatchQueue.main.async { [weak self] in self?.blockedClickCallback?() }
+                        return nil
+                    }
+                    
+                    if upToDown < 0.05 {
+                        // Break-bounce (shortly after physical/virtual release)
+                        DispatchQueue.main.async { [weak self] in self?.blockedClickCallback?() }
+                        return nil
+                    }
+                    
+                    virtuallyDown = true
+                    lastPassedDownTime = now
+                } else {
+                    virtuallyDown = true
+                    lastPassedDownTime = now
                 }
                 
-                lastClickTime = now
+            } else if type == .otherMouseUp {
+                let now = Date().timeIntervalSince1970
+                
+                if measurementMode {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.rawEventCallback?(false, now)
+                    }
+                }
+                lastPhysicalUpTime = now
+                
+                if isActive {
+                    if !virtuallyDown {
+                        // OS thinks it's already Up. Block extra physical UPs.
+                        return nil
+                    }
+                    
+                    virtuallyDown = false
+                    lastPassedUpTime = now
+                } else {
+                    virtuallyDown = false
+                    lastPassedUpTime = now
+                }
             }
         }
         
