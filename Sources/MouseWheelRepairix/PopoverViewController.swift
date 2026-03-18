@@ -22,7 +22,8 @@ class PopoverViewController: NSViewController {
     
     // Measurement view controls
     private var measureIntervalLabel: NSTextField!
-    private var measureHistoryView: NSStackView!
+    private var measureHistoryLabel: NSTextField!
+    private var measureScrollView: NSScrollView!
     private var emptyStateLabel: NSTextField!
     private var clickMeasurements: [(index: Int, interval: Double, duration: Double)] = []
     private var measureCounter = 0
@@ -200,26 +201,47 @@ class PopoverViewController: NSViewController {
         emptyStateLabel.cell?.wraps = true
         mainStack.addArrangedSubview(emptyStateLabel)
         
-        measureHistoryView = NSStackView()
-        measureHistoryView.orientation = .vertical
-        measureHistoryView.spacing = 4
-        measureHistoryView.alignment = .leading
+        // History label (multi-line NSTextField — proven to render in popovers)
+        measureHistoryLabel = NSTextField(labelWithString: "")
+        measureHistoryLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        measureHistoryLabel.textColor = .white
+        measureHistoryLabel.maximumNumberOfLines = 0
+        measureHistoryLabel.cell?.wraps = true
+        measureHistoryLabel.cell?.isScrollable = false
+        measureHistoryLabel.lineBreakMode = .byWordWrapping
+        measureHistoryLabel.translatesAutoresizingMaskIntoConstraints = false
+        measureHistoryLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         
-        let historyScrollView = NSScrollView()
-        historyScrollView.hasVerticalScroller = true
-        historyScrollView.drawsBackground = false
-        historyScrollView.documentView = measureHistoryView
-        historyScrollView.translatesAutoresizingMaskIntoConstraints = false
-        
-        mainStack.addArrangedSubview(historyScrollView)
+        // Wrap in a flipped container for top-aligned scroll
+        let flipContainer = FlippedView()
+        flipContainer.translatesAutoresizingMaskIntoConstraints = false
+        flipContainer.addSubview(measureHistoryLabel)
         
         NSLayoutConstraint.activate([
-            historyScrollView.heightAnchor.constraint(equalToConstant: 120),
-            measureHistoryView.widthAnchor.constraint(equalTo: historyScrollView.widthAnchor, constant: -16)
+            measureHistoryLabel.topAnchor.constraint(equalTo: flipContainer.topAnchor, constant: 4),
+            measureHistoryLabel.leadingAnchor.constraint(equalTo: flipContainer.leadingAnchor, constant: 4),
+            measureHistoryLabel.trailingAnchor.constraint(equalTo: flipContainer.trailingAnchor, constant: -4),
+            measureHistoryLabel.bottomAnchor.constraint(lessThanOrEqualTo: flipContainer.bottomAnchor)
+        ])
+        
+        measureScrollView = NSScrollView()
+        measureScrollView.hasVerticalScroller = true
+        measureScrollView.hasHorizontalScroller = false
+        measureScrollView.autohidesScrollers = true
+        measureScrollView.drawsBackground = false
+        measureScrollView.borderType = .noBorder
+        measureScrollView.translatesAutoresizingMaskIntoConstraints = false
+        measureScrollView.documentView = flipContainer
+        
+        mainStack.addArrangedSubview(measureScrollView)
+        
+        NSLayoutConstraint.activate([
+            measureScrollView.heightAnchor.constraint(equalToConstant: 150),
+            flipContainer.widthAnchor.constraint(equalTo: measureScrollView.contentView.widthAnchor)
         ])
         
         // Initial state
-        measureHistoryView.isHidden = true
+        measureScrollView.isHidden = true
         emptyStateLabel.isHidden = false
         
         // Spacer
@@ -234,35 +256,6 @@ class PopoverViewController: NSViewController {
         mainStack.addArrangedSubview(recommendLabel)
         
         return container
-    }
-    
-    private func createHistoryRow(measurement: (index: Int, interval: Double, duration: Double)) -> NSView {
-        let row = NSStackView()
-        row.orientation = .horizontal
-        row.spacing = 8
-        
-        let numLabel = NSTextField(labelWithString: "\(measurement.index).")
-        numLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
-        numLabel.textColor = NSColor.white.withAlphaComponent(0.4)
-        numLabel.widthAnchor.constraint(equalToConstant: 25).isActive = true
-        
-        let intStr = measurement.interval > 0 ? String(format: "Int: %4.0f", measurement.interval) : "Int:  ---"
-        let intLabel = NSTextField(labelWithString: intStr)
-        intLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
-        intLabel.textColor = (measurement.interval > 0 && measurement.interval < 100) ? NSColor.systemRed : .white
-        intLabel.widthAnchor.constraint(equalToConstant: 65).isActive = true
-        
-        let durStr = measurement.duration >= 0 ? String(format: " Dur: %4.0f", measurement.duration) : " Dur:  ---"
-        let durLabel = NSTextField(labelWithString: durStr)
-        durLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
-        durLabel.textColor = NSColor.systemTeal.withAlphaComponent(0.9)
-        
-        row.addArrangedSubview(numLabel)
-        row.addArrangedSubview(intLabel)
-        row.addArrangedSubview(durLabel)
-        row.addArrangedSubview(NSView())
-        
-        return row
     }
     
     // MARK: - Animation
@@ -962,24 +955,32 @@ class PopoverViewController: NSViewController {
     }
     
     private func updateMeasureHistory() {
-        guard let historyView = measureHistoryView else { return }
-        
         let hasData = !clickMeasurements.isEmpty
         emptyStateLabel?.isHidden = hasData
-        historyView.isHidden = !hasData // Keep stackview visibility in sync
-        historyView.superview?.superview?.isHidden = !hasData // Hide scrollview if empty
+        measureScrollView?.isHidden = !hasData
         
-        // Remove old rows
-        for view in historyView.arrangedSubviews {
-            historyView.removeArrangedSubview(view)
-            view.removeFromSuperview()
+        guard hasData else { return }
+        
+        var text = ""
+        for m in clickMeasurements {
+            let intStr = m.interval > 0 ? String(format: "%4.0f ms", m.interval) : " --- ms"
+            let durStr = m.duration >= 0 ? String(format: "%4.0f ms", m.duration) : " --- ms"
+            text += String(format: "%2d.  Int: %@  Dur: %@\n", m.index, intStr, durStr)
         }
         
-        if hasData {
-            for m in clickMeasurements {
-                let row = createHistoryRow(measurement: m)
-                historyView.addArrangedSubview(row)
-            }
+        measureHistoryLabel?.stringValue = text
+        measureHistoryLabel?.sizeToFit()
+        
+        // Update the container size for scrolling
+        if let container = measureScrollView?.documentView {
+            var frame = container.frame
+            frame.size.height = measureHistoryLabel?.frame.height ?? 0 + 8
+            container.frame = frame
         }
     }
+}
+
+// Helper: top-aligned scrollable container
+class FlippedView: NSView {
+    override var isFlipped: Bool { return true }
 }
